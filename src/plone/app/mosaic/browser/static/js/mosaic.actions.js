@@ -391,7 +391,7 @@ define([
         var m = new Modal($('.mosaic-toolbar'),
           {ajaxUrl: $.mosaic.options.context_url +
            '/@@add-tile?form.button.Create=Create',
-           timeout: 12000});
+           timeout: 15000});
         m.show();
       }
     });
