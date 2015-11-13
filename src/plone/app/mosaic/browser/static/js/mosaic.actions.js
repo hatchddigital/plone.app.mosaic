@@ -390,7 +390,8 @@ define([
         // Open overlay
         var m = new Modal($('.mosaic-toolbar'),
           {ajaxUrl: $.mosaic.options.context_url +
-           '/@@add-tile?form.button.Create=Create'});
+           '/@@add-tile?form.button.Create=Create',
+           timeout: 12000});
         m.show();
       }
     });
