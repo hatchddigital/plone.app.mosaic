@@ -390,8 +390,7 @@ define([
         // Open overlay
         var m = new Modal($('.mosaic-toolbar'),
           {ajaxUrl: $.mosaic.options.context_url +
-           '/@@add-tile?form.button.Create=Create',
-           timeout: 15000});
+           '/@@add-tile?form.button.Create=Create'});
         m.show();
       }
     });
@@ -440,9 +439,11 @@ define([
             $.ajax({
               type: "GET",
               url: url,
+              timeout: 15000,
               success: function (value) {
                 var authenticator = $(value).find('[name="_authenticator"]').val();
                 $.ajax({
+                  timeout: 15000,
                   type: "POST",
                   url: url,
                   data: {
@@ -528,6 +529,7 @@ define([
             url: $.mosaic.options.context_url +
               '/@@add-tile?tiletype=' + tile_type +
               '&form.button.Create=Create',
+            timeout: 15000,
             success: function(value, xhr) {
               utils.loading.hide();
               var $value, action_url, authenticator, modalFunc;
@@ -542,7 +544,9 @@ define([
                 $.mosaic.overlay.app = new Modal($('.mosaic-toolbar'), {
                   html: html,
                   loadLinksWithinModal: true,
-                  buttons: '.formControls > input[type="submit"], .actionButtons > input[type="submit"]'
+                  buttons: '.formControls > input[type="submit"], .actionButtons > input[type="submit"]',
+                  timeout: 15000,
+                  actionOptions: {timeout: 15000}
                 });
                 $.mosaic.overlay.app.$el.off('after-render');
                 $.mosaic.overlay.app.on(
@@ -593,6 +597,7 @@ define([
                 $("form", $value).ajaxSubmit({
                   type: "POST",
                   url: action_url,
+                  timeout: 15000,
                   data: {
                     'buttons.save': 'Save',
                     '_authenticator': authenticator

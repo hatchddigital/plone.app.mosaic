@@ -32,6 +32,7 @@ define([
           $.ajax({
             url: edit_url,
             method: 'POST',
+            timeout: 15000,
             data: {
               'plone.app.standardtiles.rawhtml.content': that.$el.children('.mosaic-tile-content').html(),
               _authenticator: utils.getAuthenticator(),
