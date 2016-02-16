@@ -6,15 +6,12 @@ Changelog
 
 New:
 
-- fix issue where you would no longer be able to edit a rich text area
-  after you clear the whole area out
+- do not remove data-pat-tinymce body attribute as this is not
+  necessary with how tinymce is initialized anymore
   [vangheem]
 
 - align rich text editor right if the tile is more on the right side
   of the page
-  [vangheem]
-
-- only show drag handlers if customizing layout
   [vangheem]
 
 - If only one layout is available, auto-select it.
@@ -23,7 +20,37 @@ New:
 - Be able to show/hide content layouts.
   [vangheem]
 
+
 Fixes:
+
+- Fix tinymce toolbar scrolling out of view with large rich text tiles.
+  TinyMCE toolbar will now being sticky as the user scrolls down.
+  [vangheem]
+
+- Fix tiles not rendering correctly if they contain JavaScript patterns
+  when adding and moving them around.
+  [vangheem]
+
+- fix do not add _layout multiple times to tile data
+  [vangheem]
+
+- fix issue where spurious &nbsp; was getting saved to description
+  [vangheem]
+
+- issue when registry configuration parsing would throw an error
+  [vangheem]
+
+- fix issue where you would end up saving non-resolveuid urls to rawhtml
+  tiles and also prevent write conflicts when the editor sends out multiple
+  edits at the same time
+  [vangheem]
+
+- only show drag handlers if customizing layout
+  [vangheem]
+
+- fix issue where you would no longer be able to edit a rich text area
+  after you clear the whole area out
+  [vangheem]
 
 - Fixed weird Firefox bug with TinyMCE that prevented data from being saved.
   [vangheem]

@@ -15,6 +15,56 @@ define([
 
   var log = logger.getLogger('pat-mosaic');
 
+  var _positionActiveTinyMCE = function(){
+    var $toolbar = $('.mosaic-rich-text-toolbar:visible');
+    if($toolbar.size() === 0 || $toolbar.find('.mce-first').size() === 0){
+      /* make sure it actually has a toolbar */
+      return;
+    }
+
+    var $tile = $toolbar.parent();
+    // detect if tile is more on the right side of the screen
+    // than the left, if it is, align it right
+    $toolbar.removeClass('right');
+    if($tile.offset().left > ($(window).width() / 2)){
+      $toolbar.addClass('right');
+    }
+
+    // calculate if toolbar has been scrolled out of view.
+    // we calculate the top divider since when we move to
+    // make the tiny toolbar sticky, it'll get shifted
+    var $window = $(window);
+
+    if(($tile.offset().top - $toolbar.height()) < $window.scrollTop()){
+      // just checking if we reached the top of the tile + size of toolbar
+      if(!$toolbar.hasClass('sticky')){
+        // only need to calculate once and then leave alone
+        $toolbar.addClass('sticky');
+        // right under mosaic toolbar
+        var attrs = {
+          top: $('.mosaic-toolbar').height() + $toolbar.height()
+        };
+        if($toolbar.hasClass('right')){
+          attrs.right = $toolbar.offset().right;
+        }else{
+          attrs.left = $toolbar.offset().left;
+        }
+        $toolbar.css(attrs);
+      }
+    }else{
+      $toolbar.removeClass('sticky');
+      $toolbar.removeAttr('style');
+    }
+  };
+  var _positionTimeout = 0;
+  var positionActiveTinyMCE = function(){
+    clearTimeout(_positionTimeout);
+    _positionTimeout = setTimeout(_positionActiveTinyMCE, 50);
+  };
+  $(window).off('scroll', positionActiveTinyMCE).on('scroll', positionActiveTinyMCE);
+
+
+
   /* Tile class */
   var Tile = function(el){
     var that = this;
@@ -28,20 +78,37 @@ define([
       if(tiletype === 'plone.app.standardtiles.rawhtml'){
         var edit_url = that.getEditUrl();
         if(edit_url){
+          var currentData = that.getHtmlContent();
+          if(currentData === that.$el.data('lastSavedData')){
+            // not dirty, do not save
+            return;
+          }
+          // we also need to prevent double saving, conflict errors
+          if(that.$el.data('activeSave')){
+            return;
+          }
+          that.$el.data('activeSave', true);
           // need to save tile
           $.ajax({
             url: edit_url,
             method: 'POST',
             timeout: 15000,
             data: {
-              'plone.app.standardtiles.rawhtml.content': that.$el.children('.mosaic-tile-content').html(),
+              'plone.app.standardtiles.rawhtml.content': currentData,
               _authenticator: utils.getAuthenticator(),
               'buttons.save': 'Save'
             }
+          }).always(function(){
+            that.$el.data('lastSavedData', currentData);
+            that.$el.data('activeSave', false);
           });
         }
       }
     });
+  };
+
+  Tile.prototype.getHtmlContent = function(){
+    return this.$el.children('.mosaic-tile-content').html();
   };
 
   Tile.prototype.getEditUrl = function(){
@@ -400,6 +467,15 @@ define([
         that.$el.addClass('mosaic-tile-loading');
         url = base ? [base, href].join('/')
                                  .replace(/\/+\.\//g, '/') : href;
+        // in case tile should be rendered differently for layout editor
+        if(url.indexOf('?') === -1){
+          url += '?';
+        }else{
+          url += '&';
+        }
+        if(url.indexOf('_layouteditor') === -1){
+          url += '_layouteditor=true';
+        }
         $.ajax({
           type: "GET",
           url: url,
@@ -417,6 +493,10 @@ define([
             if(tiletype === 'plone.app.standardtiles.rawhtml'){
               // a little gymnastics to make wysiwyg work here
               // Init rich editor
+              if(!that.$el.data('lastSavedData')){
+                // save initial state
+                that.$el.data('lastSavedData', that.getHtmlContent());
+              }
               that.setupWysiwyg();
             }
           },
@@ -431,11 +511,45 @@ define([
       // need to replace the data-tile node here
       var $el = this.$el.find('[data-tile]').parent();
       $el.html(html);
-      Registry.scan($el);
       var $content = this.$el.children(".mosaic-tile-content");
       if(tileUrl && $content.size() > 0){
         $content.attr('data-tileUrl', tileUrl.replace(/&/gim, '&amp;'));
       }
+      this.cacheHtml(html);
+      this.scanRegistry();
+    };
+
+    Tile.prototype.cacheHtml = function(html) {
+      /* Cache html on the tile element.
+         This is only used by the scanRegistry method so
+         we can reset the html of the html when running the pattern registry.
+         */
+      var $content = this.$el.children(".mosaic-tile-content");
+      if($content.size() === 0){
+        return;
+      }
+      if(html === undefined){
+        html = $content.html();
+      }
+      $content[0]._preScanHTML = html;
+    };
+
+    Tile.prototype.scanRegistry = function(){
+      /*
+        A bit tricky here because tiles can contain patterns.
+        Pay attention to the use of _preScanHTML.
+        If we do not do this, tiles do not render correctly when
+        adding, dragging and dropping.
+      */
+      var $el = this.$el.find(".mosaic-tile-content");
+      if($el.size() === 0){
+        return;
+      }
+      if($el[0]._preScanHTML){
+        /* reset html because transform has happened */
+        $el.html($el[0]._preScanHTML);
+      }
+      Registry.scan($el);
     };
 
     Tile.prototype.select = function(){
@@ -517,6 +631,7 @@ define([
           $('.mosaic-panel .mosaic-' + tiletype + '-tile', $.mosaic.document).find('.mosaic-tile-content > *').each(function () {
             value += $(this).html()
               .replace(/<br[^>]*>/ig, newline)
+              .replace("&nbsp;", "")
               .replace(/^\s+|\s+$/g, '') + newline;
           });
           value = value.replace(/^\s+|\s+$/g, '');
@@ -622,25 +737,16 @@ define([
       var _placeholder = function() {
         if ($content.text().replace(/^\s+|\s+$/g, '').length === 0) {
           $content.addClass('mosaic-tile-content-empty');
-          $content.empty().append('<p>&nbsp;</p>');
+          $content.empty().append('<p></p>');
         } else {
           $content.removeClass('mosaic-tile-content-empty');
         }
       };
       var timeout = 0;
       var placeholder = function(){
-        clearTimeout();
+        clearTimeout(timeout);
         timeout = setTimeout(_placeholder, 100);
       };
-
-      // XXX: Required to override global settings in Plone 5
-      $("body").removeAttr("data-pat-tinymce");
-
-      // detect if tile is more on the right side of the screen
-      // than the left, if it is, align it right
-      if(this.$el.offset().left > ($(window).width() / 2)){
-        $editorContainer.css('right', '0');
-      }
 
       // Init rich editor
       pattern = new TinyMCE($content, $.extend(
@@ -664,6 +770,7 @@ define([
               if($tile.size() > 0){
                 var tile = new Tile($tile);
                 tile.select();
+                positionActiveTinyMCE();
               }
             }
           });
